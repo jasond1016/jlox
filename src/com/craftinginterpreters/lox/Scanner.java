@@ -165,8 +165,8 @@ public class Scanner {
         while (peek() != '"' && !isAtEnd()) {
             if (peek() == '\n') {
                 line++;
-                advance();
             }
+            advance();
         }
 
         if (isAtEnd()) {
