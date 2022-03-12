@@ -5,7 +5,7 @@ import java.util.List;
 public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
     private Environment environment = new Environment();
-    
+
     void interpret(List<Stmt> statements) {
         try {
             for (Stmt statement : statements) {
@@ -27,7 +27,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     public Object visitBinaryExpr(Expr.Binary expr) {
         Object left = evaluate(expr.left);
         Object right = evaluate(expr.right);
-        
+
         switch (expr.operator.type) {
             case BANG_EQUAL:
                 return !isEqual(left, right);
@@ -55,7 +55,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
                 if (left instanceof String && right instanceof String) {
                     return (String) left + (String) right;
                 }
-                
+
                 throw new RuntimeError(expr.operator, "Operands must be two numbers or two strings.");
             case SLASH:
                 checkNumberOperands(expr.operator, left, right);
@@ -65,7 +65,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
                 return (double) left * (double) right;
         }
 
-               
+
         return null;
     }
 
@@ -77,6 +77,22 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     @Override
     public Object visitLiteralExpr(Expr.Literal expr) {
         return expr.value;
+    }
+
+    @Override
+    public Object visitLogicalExpr(Expr.Logical expr) {
+        Object left = evaluate(expr.left);
+
+        if (expr.operator.type == TokenType.OR) {
+            if (isTruthy(expr.left)) {
+                return left;
+            }
+        } else {
+            if (!isTruthy(expr.left)) {
+                return left;
+            }
+        }
+        return evaluate(expr.right);
     }
 
     @Override
@@ -92,11 +108,11 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         }
         return null;
     }
-    
+
     private Object evaluate(Expr expr) {
         return expr.accept(this);
     }
-    
+
     private void execute(Stmt statement) {
         statement.accept(this);
     }
@@ -124,13 +140,13 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         if (object == null) {
             return false;
         }
-        
+
         if (object instanceof Boolean) {
-            return (boolean)object;
+            return (boolean) object;
         }
         return true;
     }
-    
+
     private boolean isEqual(Object a, Object b) {
         if (a == null && b == null) {
             return true;
@@ -145,7 +161,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         if (object == null) {
             return "nil";
         }
-        
+
         if (object instanceof Double) {
             String text = object.toString();
             if (text.endsWith(".0")) {
@@ -156,7 +172,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
         return object.toString();
     }
-    
+
     private void checkNumberOperand(Token token, Object operand) {
         if (operand instanceof Double) {
             return;
@@ -178,6 +194,16 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     }
 
     @Override
+    public Void visitIfStmt(Stmt.If stmt) {
+        if (isTruthy(evaluate(stmt.condition))) {
+            execute(stmt.thenBranch);
+        } else if (stmt.elseBranch != null) {
+            execute(stmt.elseBranch);
+        }
+        return null;
+    }
+
+    @Override
     public Void visitPrintStmt(Stmt.Print stmt) {
         Object value = evaluate(stmt.expression);
         System.out.println(stringify(value));
@@ -187,12 +213,20 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     @Override
     public Void visitVarStmt(Stmt.Var stmt) {
         Object value = null;
-        
+
         if (stmt.initializer != null) {
             value = evaluate(stmt.initializer);
         }
 
         environment.define(stmt.name.lexeme, value);
+        return null;
+    }
+
+    @Override
+    public Void visitWhileStmt(Stmt.While stmt) {
+        while (isTruthy(evaluate(stmt.condition))) {
+            execute(stmt.body);
+        }
         return null;
     }
 
