@@ -1,9 +1,19 @@
-fun sayHi(first, last) {
-  print "Hi, " + first + " " + last + "!";
+fun makeCounter() {
+  var i = 0;
+  fun count() {
+    i = i + 1;
+    print i;
+  }
+
+  return count;
 }
 
-sayHi("Dear", "Reader");
-print "1" == "1" and "1" == "2";
-print "1" == "2" and "1" == "1";
-print "1" == "1" or "1" == "2";
-print "1" == "2" or "1" == "1";
+fun scope(a) {
+  var a = "local";
+  print a;
+}
+
+var counter = makeCounter();
+counter(); // "1".
+counter(); // "2".
+scope("Test");
