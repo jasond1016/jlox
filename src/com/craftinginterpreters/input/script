@@ -1,1 +1,8 @@
-return "top-level return";
+class Bacon {
+  eat() {
+    print "Crunch crunch crunch!";
+  }
+}
+
+Bacon().eat = "test"; // Prints "Crunch crunch crunch!".
+Bacon().eat();
