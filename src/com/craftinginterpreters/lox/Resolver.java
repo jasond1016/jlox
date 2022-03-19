@@ -18,9 +18,17 @@ public class Resolver implements Expr.Visitor, Stmt.Visitor {
     private enum FunctionType {
         NONE,
         FUNCTION,
+        INITIALIZER,
         METHOD,
     }
-    
+
+    private enum ClassType {
+        NONE,
+        CLASS,
+    }
+
+    private ClassType currentClass = ClassType.NONE;
+
     @Override
     public Void visitBlockStmt(Stmt.Block stmt) {
         beginScope();
@@ -31,14 +39,26 @@ public class Resolver implements Expr.Visitor, Stmt.Visitor {
 
     @Override
     public Void visitClassStmt(Stmt.Class stmt) {
+        ClassType enclosingClass = currentClass;
+        currentClass = ClassType.CLASS;
+
         declare(stmt.name);
+        define(stmt.name);
+
+        beginScope();
+        scopes.peek().put("this", true);
 
         for (Stmt.Function method : stmt.methods) {
             FunctionType declaration = FunctionType.METHOD;
+            if (method.name.lexeme.equals("init")) {
+                declaration = FunctionType.INITIALIZER;
+            }
             resolveFunction(method, declaration);
         }
-        
-        define(stmt.name);
+
+        endScope();
+
+        currentClass = enclosingClass;
         return null;
     }
 
@@ -78,7 +98,11 @@ public class Resolver implements Expr.Visitor, Stmt.Visitor {
         if (currentFunction == FunctionType.NONE) {
             Lox.error(stmt.keyword, "Can't return from top-level code.");
         }
+
         if (stmt.value != null) {
+            if (currentFunction == FunctionType.INITIALIZER) {
+                Lox.error(stmt.keyword, "Cant't return a value from an initializer.");
+            }
             resolve(stmt.value);
         }
         return null;
@@ -104,7 +128,7 @@ public class Resolver implements Expr.Visitor, Stmt.Visitor {
     @Override
     public Void visitAssignExpr(Expr.Assign expr) {
         resolve(expr.value);
-        resolverLocal(expr, expr.name);
+        resolveLocal(expr, expr.name);
         return null;
     }
 
@@ -156,6 +180,16 @@ public class Resolver implements Expr.Visitor, Stmt.Visitor {
     }
 
     @Override
+    public Void visitThisExpr(Expr.This expr) {
+        if (currentClass == ClassType.NONE) {
+            Lox.error(expr.keyword, "Can't use 'this' outside of a class.");
+            return null;
+        }
+        resolveLocal(expr, expr.keyword);
+        return null;
+    }
+
+    @Override
     public Void visitUnaryExpr(Expr.Unary expr) {
         resolve(expr.right);
         return null;
@@ -166,7 +200,7 @@ public class Resolver implements Expr.Visitor, Stmt.Visitor {
         if (!scopes.isEmpty() && scopes.peek().get(expr.name.lexeme) == Boolean.FALSE) {
             Lox.error(expr.name, "Can't read local variable in its own initializer.");
         }
-        resolverLocal(expr, expr.name);
+        resolveLocal(expr, expr.name);
         return null;
     }
 
@@ -188,7 +222,7 @@ public class Resolver implements Expr.Visitor, Stmt.Visitor {
         scopes.peek().put(name.lexeme, true);
     }
 
-    private void resolverLocal(Expr expr, Token name) {
+    private void resolveLocal(Expr expr, Token name) {
         for (int i = scopes.size() - 1; i >= 0; i--) {
             if (scopes.get(i).containsKey(name.lexeme)) {
                 interpreter.resolve(expr, scopes.size() - 1 - i);
@@ -220,11 +254,11 @@ public class Resolver implements Expr.Visitor, Stmt.Visitor {
     void resolve(Stmt stmt) {
         stmt.accept(this);
     }
-    
+
     void resolve(Expr expr) {
         expr.accept(this);
     }
-    
+
     private void beginScope() {
         scopes.push(new HashMap<>());
     }
